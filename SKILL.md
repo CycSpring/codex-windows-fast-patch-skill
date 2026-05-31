@@ -1,11 +1,11 @@
 ---
 name: codex-windows-fast-patch
-description: Reapply the Windows Codex Desktop MSIX patch after Store upgrades, including Fast Mode, plugin UI gates, Goal command gates, Windows Computer Use availability gates, ASAR integrity repair, signing/installing the patched package, SDK cleanup, Fast Mode wire verification, and registering the local plugin marketplace openai-curated-local.
+description: Reapply the Windows Codex Desktop MSIX patch after Store upgrades, including Fast Mode, plugin UI gates, Goal command gates, Windows Computer Use availability gates, Chinese locale/i18n restoration, local conversation Delete chat support, ASAR integrity repair, signing/installing the patched package, SDK cleanup, Fast Mode wire verification, and registering the local plugin marketplace openai-curated-local.
 ---
 
 # Codex Windows Fast Patch
 
-Use this skill when the user says Codex Desktop was upgraded and the Fast Mode / Plugins / Goal patch disappeared, asks to repatch Codex on Windows, asks to verify whether Fast Mode is really being sent, asks to restore/register the local plugin marketplace, or asks to enable Windows Computer Use in Codex Desktop. Also use it when the Computer Control settings page shows "Any App" / "任意应用" as disabled by organization or unavailable in the current region.
+Use this skill when the user says Codex Desktop was upgraded and the Fast Mode / Plugins / Goal patch disappeared, asks to repatch Codex on Windows, asks to verify whether Fast Mode is really being sent, asks to restore/register the local plugin marketplace, asks to restore the Chinese UI/i18n resources, asks to add or repair the local conversation Delete chat menu, or asks to enable Windows Computer Use in Codex Desktop. Also use it when the Computer Control settings page shows "Any App" / "任意应用" as disabled by organization or unavailable in the current region.
 
 ## Platform Compatibility
 

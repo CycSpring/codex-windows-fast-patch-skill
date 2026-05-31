@@ -12,6 +12,9 @@ This is the public version of the `codex-windows-fast-patch` skill. It guides ag
 - Repair local plugin marketplace manifest layout.
 - Refresh Windows Computer Use compatibility files.
 - Unlock the Computer Control `Any App` gate when the UI reports organization or region unavailability.
+- Restore Codex Desktop Chinese locale resources and i18n gates when an upgrade falls back to English UI.
+- Add a local-thread `Delete chat` entry to the sidebar menu for builds that only expose archive.
+- Re-enable desktop gates such as Goal / objective entry points when upgrades hide them again.
 
 ## Platform Support
 
@@ -51,11 +54,31 @@ After installing into Codex, restart Codex so it reloads skill metadata.
 
 ## Usage
 
-After installation, ask an agent that supports Agent Skills to use the `codex-windows-fast-patch` workflow for the Codex Desktop issue on the current machine.
+After installation, ask an agent that supports Agent Skills to use `$codex-windows-fast-patch` for the Codex Desktop issue on the current machine. This skill is intended for Windows Codex Desktop upgrades, reinstalls, missing feature gates, English UI regressions, unavailable Computer Use, broken plugin marketplaces, or Fast Mode verification.
 
-The scripts are reference implementations and operational templates, not a one-command fix that is guaranteed to work on every machine. A real run should first read `SKILL.md`, inspect the current Codex installation method, MSIX package path, ASAR contents, signing tools, plugin directories, and Computer Use file state, then decide whether to execute, adapt, or only borrow steps from the scripts.
+Recommended request:
 
-Example request: `Use the codex-windows-fast-patch skill to inspect and repair Codex Desktop Fast Mode, plugin marketplace, and Computer Use availability on this Windows machine.`
+```text
+Use $codex-windows-fast-patch to inspect and repair Codex Desktop on this Windows machine. Restore Fast Mode, plugin marketplace, Goal, Windows Computer Use, Chinese UI, and the sidebar Delete chat action.
+```
+
+You can also trigger a narrower repair:
+
+```text
+Use $codex-windows-fast-patch to verify whether my Fast Mode requests really send service_tier=priority.
+```
+
+```text
+Use $codex-windows-fast-patch to fix the Codex Desktop Any App gate being disabled by organization or region policy.
+```
+
+```text
+Use $codex-windows-fast-patch to restore the Chinese UI and add Delete chat back to the local conversation menu.
+```
+
+The scripts are reference implementations and operational templates, not a one-command fix that is guaranteed to work on every machine. A real run should first read `SKILL.md`, inspect the current Codex installation method, MSIX package path, ASAR contents, signing tools, plugin directories, locale resources, sidebar menu targets, and Computer Use file state, then decide whether to execute, adapt, or only borrow steps from the scripts.
+
+The normal flow is to run `-DryRun` first, confirm that all patch targets are found, then run the full repair. Afterward restart Codex Desktop and verify Fast Mode, Chinese UI, plugin list, Computer Use, Goal entry points, and the `Delete chat` menu item.
 
 ## CPA Upstream Configuration
 

@@ -1,8 +1,8 @@
 interface:
   display_name: "Codex Windows Fast Patch"
-  short_description: "Repatch Windows Codex Desktop after upgrades."
+  short_description: "Restore Windows Codex Desktop patches after upgrades."
   brand_color: "#2563EB"
-  default_prompt: "Use $codex-windows-fast-patch to repatch Codex Desktop on Windows after an upgrade."
+  default_prompt: "Use $codex-windows-fast-patch to inspect and repair Codex Desktop on Windows: restore Fast Mode, plugin marketplace, Goal, Windows Computer Use, Chinese UI, and the local Delete chat menu."
 
 policy:
   allow_implicit_invocation: true

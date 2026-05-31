@@ -12,6 +12,9 @@
 - 修复本地插件市场清单目录结构。
 - 刷新 Windows Computer Use 兼容文件。
 - 解除 Computer Control 页面里 `Any App` / `任意应用` 被组织或地区门控禁用的问题。
+- 恢复 Codex Desktop 中文界面资源和 i18n 开关，避免升级后菜单、控件回到英文。
+- 给本地会话侧边栏补上“删除对话”，在只有“归档”的版本里增加永久删除入口和确认提示。
+- 重新开启 Goal / 目标相关入口等升级后可能被门控隐藏的桌面端能力。
 
 ## 平台支持
 
@@ -49,13 +52,33 @@ Copy-Item -Recurse -Force -LiteralPath (Join-Path $source 'scripts') -Destinatio
 
 安装到 Codex 后，重启 Codex，让它重新加载 skill 元数据。
 
-## 使用
+## 使用方式
 
-安装后，让支持 Agent Skills 的智能体使用 `codex-windows-fast-patch` 工作流处理当前机器上的 Codex Desktop 问题。
+安装后，让支持 Agent Skills 的智能体使用 `$codex-windows-fast-patch` 处理当前机器上的 Codex Desktop 问题。这个 skill 适合在 Codex Desktop 升级、重装、功能消失、界面语言回退、Computer Use 不可用、插件市场异常、Fast Mode 不确定是否生效时调用。
 
-这些脚本是参考实现和操作模板，不是跨所有机器都能直接运行的一键方案。实际处理时应先读取 `SKILL.md`，检查当前机器的 Codex 安装方式、MSIX 包路径、ASAR 内容、签名工具、插件目录和 Computer Use 文件状态，再决定执行、改写或只借鉴其中的步骤。
+推荐直接这样问：
 
-一个典型请求是：`使用 codex-windows-fast-patch 这个 skill，检查并修复这台 Windows 机器上的 Codex Desktop Fast Mode、插件市场和 Computer Use 可用性问题。`
+```text
+使用 $codex-windows-fast-patch，检查并修复这台 Windows 机器上的 Codex Desktop。重点恢复 Fast Mode、插件市场、Goal、Windows Computer Use、中文界面，以及会话侧边栏的删除对话功能。
+```
+
+也可以按问题更具体地触发：
+
+```text
+使用 $codex-windows-fast-patch，验证我的 Fast Mode 请求是否真的发送了 service_tier=priority。
+```
+
+```text
+使用 $codex-windows-fast-patch，修复 Codex Desktop 里 Any App / 任意应用 被组织或地区门控禁用的问题。
+```
+
+```text
+使用 $codex-windows-fast-patch，恢复 Codex Desktop 中文界面，并给本地会话菜单补上删除对话。
+```
+
+这些脚本是参考实现和操作模板，不是跨所有机器都能无脑运行的一键方案。实际处理时应先读取 `SKILL.md`，检查当前机器的 Codex 安装方式、MSIX 包路径、ASAR 内容、签名工具、插件目录、语言资源、会话菜单目标文件和 Computer Use 文件状态，再决定执行、改写或只借鉴其中的步骤。
+
+通常流程是：先跑 `-DryRun` 确认补丁目标都能找到，再执行完整修复；修复完成后重启 Codex Desktop，并验证 Fast Mode、中文界面、插件列表、Computer Use、Goal 入口和“删除对话”菜单是否都存在。
 
 ## CPA 上游配置
 
