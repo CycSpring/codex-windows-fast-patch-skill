@@ -90,4 +90,4 @@ Copy-Item -Recurse -Force -LiteralPath (Join-Path $source 'scripts') -Destinatio
 
 ## 致谢
 
-感谢 [LinuxDo community](https://linux.do/) 中相关讨论和反馈对这个工作流的启发。
+感谢原作者https://github.com/chen0416ccc-cpu/codex-windows-fast-patch-skill。
