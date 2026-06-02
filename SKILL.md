@@ -7,6 +7,8 @@ description: Reapply the Windows Codex Desktop MSIX patch after Store upgrades, 
 
 Use this skill when the user says Codex Desktop was upgraded and the Fast Mode / Plugins / Goal patch disappeared, asks to repatch Codex on Windows, asks to verify whether Fast Mode is really being sent, asks to restore/register the local plugin marketplace, asks to restore the Chinese UI/i18n resources, asks to add or repair the local conversation Delete chat menu, or asks to enable Windows Computer Use in Codex Desktop. Also use it when the Computer Control settings page shows "Any App" / "任意应用" as disabled by organization or unavailable in the current region.
 
+For future maintenance context and the history of recent script merges, see `MAINTENANCE.md` in the repo root.
+
 ## Platform Compatibility
 
 This skill is Windows-only. It depends on the Windows Store/MSIX package layout, PowerShell, `Get-AppxPackage`, `makeappx.exe`, `signtool.exe`, Windows user environment variables, and Windows Computer Use helper paths.
@@ -46,6 +48,7 @@ It also verifies and writes the local marketplace config at `$env:USERPROFILE\.c
 It also syncs the installed `openai-bundled` marketplace from the current Codex package into `$env:USERPROFILE\.codex\.tmp\bundled-marketplaces\openai-bundled`, overlays a local `computer-use@openai-bundled` compatibility plugin, writes that local marketplace into config, and enables `CODEX_ELECTRON_ENABLE_WINDOWS_COMPUTER_USE=1` for the current user so the Desktop app can expose Windows Computer Use after restart.
 It also patches the Desktop webview gates that otherwise hide or disable Windows Computer Use behind the `computer_use` experimental feature and Statsig gate `1506311413`, and it writes `features.computer_use = true` into `$env:USERPROFILE\.codex\config.toml` without replacing the rest of the `[features]` table.
 It also repairs local marketplace manifest layout when a local root has only a legacy root `marketplace.json`; the current Codex CLI expects `.agents\plugins\marketplace.json`, and missing that file can make `codex plugin list` fail for all configured marketplaces.
+The bundled MSIX patch script now keeps a richer Fast Mode capture on failure, tries both `model_providers.OpenAI.base_url` and `openai_base_url` overrides when validating the wire request, records Codex CLI output per attempt, and keeps the capture directory automatically when verification fails so it can be inspected afterward.
 
 ## Important Guardrails
 
@@ -81,6 +84,22 @@ Remove-Item Env:ELECTRON_ENABLE_LOGGING -ErrorAction SilentlyContinue
 - `-RegisterMarketplaceOnly`: only register `openai-curated-local`; do not patch Codex.
 - `-PatchScript <path>`: override the bundled patch script only when testing a newer patcher.
 - `-SkipComputerUse`: skip installing/verifying the local Computer Use compatibility plugin.
+
+## Helper Scripts
+
+To install a previously built patched MSIX directly, use the parameterized helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\codex-windows-fast-patch\scripts\install-patched-msix.ps1" -MsixPath "C:\Users\you\Downloads\codex-msix-repack\OpenAI.Codex_xxx\artifacts\OpenAI.Codex_xxx_patched.msix"
+```
+
+Useful helper options:
+
+- `-CertThumbprint <thumbprint>`: trust a specific signing certificate before install.
+- `-NoLaunch`: install without starting Codex Desktop.
+- `-StatusPath <path>`: append timestamped progress lines to a status file.
+- `-SkipCurrentUserTrust`: do not import the signing certificate into CurrentUser stores.
+- `-SkipLocalMachineTrust`: do not import the signing certificate into LocalMachine stores.
 
 ## Computer Use Only
 

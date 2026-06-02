@@ -1,4 +1,4 @@
-# Codex Windows Fast Patch Skill
+﻿# Codex Windows Fast Patch Skill
 
 Language: [中文](README.md) | English
 
@@ -27,9 +27,11 @@ Do not run it on macOS. A macOS version needs a separate workflow for the Codex 
 ## Files
 
 - `SKILL.md`: Agent skill entrypoint.
+- `MAINTENANCE.md`: Notes for future sessions, update rules, and recent merge history.
 - `agents/openai.yaml`: Agent configuration.
 - `scripts/repatch-codex-windows.ps1`: Workflow reference script.
 - `scripts/patch_codex_fast_mode_windows_msix.ps1`: MSIX / ASAR patch reference implementation.
+- `scripts/install-patched-msix.ps1`: Helper for trusting a signing certificate and installing a previously built patched MSIX.
 - `scripts/install-computer-use-local.ps1`: Windows Computer Use local compatibility reference implementation.
 
 ## Install
@@ -46,6 +48,7 @@ $dest = Join-Path $env:USERPROFILE '.codex\skills\codex-windows-fast-patch'
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 
 Copy-Item -Force -LiteralPath (Join-Path $source 'SKILL.md') -Destination $dest
+Copy-Item -Force -LiteralPath (Join-Path $source 'MAINTENANCE.md') -Destination $dest
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $source 'agents') -Destination $dest
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $source 'scripts') -Destination $dest
 ```
@@ -80,6 +83,18 @@ The scripts are reference implementations and operational templates, not a one-c
 
 The normal flow is to run `-DryRun` first, confirm that all patch targets are found, then run the full repair. Afterward restart Codex Desktop and verify Fast Mode, Chinese UI, plugin list, Computer Use, Goal entry points, and the `Delete chat` menu item.
 
+## Helper Scripts
+
+To install a previously built patched MSIX without rerunning the full repack flow:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\codex-windows-fast-patch\scripts\install-patched-msix.ps1" -MsixPath "C:\Users\you\Downloads\codex-msix-repack\OpenAI.Codex_xxx\artifacts\OpenAI.Codex_xxx_patched.msix"
+```
+
+The helper can locate a certificate by publisher automatically, or you can pass `-CertThumbprint <thumbprint>` when the MSIX was signed with a known local certificate. It also supports `-StatusPath <path>` for timestamped progress logging and `-NoLaunch` if you do not want to start Codex Desktop immediately after install.
+
+Fast Mode verification inside `scripts/patch_codex_fast_mode_windows_msix.ps1` now tries both `model_providers.OpenAI.base_url` and `openai_base_url`, captures both WebSocket frames and HTTP request bodies, disables plugins and apps during the probe, records Codex CLI output per attempt, and keeps the capture directory automatically when verification fails.
+
 ## CPA Upstream Configuration
 
 If Codex requests go through CPA upstream, changing the local request to `service_tier=priority` is not enough by itself. Add a CPA override rule for the models that handle Codex requests and force the parameter `service_tier` to string value `priority`, so the upstream actually uses the Fast / Priority path.
@@ -90,4 +105,4 @@ The model names in the image are examples. Use the real Codex-facing model names
 
 ## Acknowledgements
 
-Thanks to the [LinuxDo community](https://linux.do/) for the discussions and feedback around this workflow.
+Thanks to the original public work at [chen0416ccc-cpu/codex-windows-fast-patch-skill](https://github.com/chen0416ccc-cpu/codex-windows-fast-patch-skill) and to the [LinuxDo community](https://linux.do/) for the discussions and feedback around this workflow.

@@ -1505,6 +1505,29 @@ function Add-LocalMarketplace {
   }
 }
 
+function Get-ServiceTierFromCaptureLog {
+  param([string]$LogPath)
+
+  if (-not (Test-Path -LiteralPath $LogPath)) {
+    return $null
+  }
+
+  foreach ($line in (Get-Content -LiteralPath $LogPath -ErrorAction SilentlyContinue)) {
+    if ($line -notmatch '"kind":"(frame|http)"') {
+      continue
+    }
+    # The captured Codex request can be very large because it contains the
+    # active prompt context. Regex over the raw JSONL line is faster and less
+    # fragile here than repeatedly parsing the full object.
+    $match = [regex]::Match([string]$line, '\\?"service_tier\\?"\s*:\s*\\?"([^"\\]+)\\?"')
+    if ($match.Success) {
+      return $match.Groups[1].Value
+    }
+  }
+
+  return $null
+}
+
 function Invoke-FastModeVerification {
   $codex = Find-CodexCli
   if (-not $codex) {
@@ -1518,6 +1541,7 @@ function Invoke-FastModeVerification {
   $serverPath = Join-Path $captureDir 'ws-capture-server.cjs'
   $logPath = Join-Path $captureDir 'frames.jsonl'
   $readyPath = $logPath + '.ready'
+  $keepCapture = $KeepWorkDir
 
   $serverSource = @'
 const crypto = require("crypto");
@@ -1574,7 +1598,13 @@ const server = http.createServer((req, res) => {
   req.on("data", (chunk) => chunks.push(chunk));
   req.on("end", () => {
     const body = Buffer.concat(chunks).toString("utf8");
-    write({ kind: "http", method: req.method, url: req.url, body });
+    write({
+      kind: "http",
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      body,
+    });
     res.writeHead(200, {
       "content-type": "application/json",
       "connection": "close",
@@ -1645,45 +1675,98 @@ setTimeout(() => server.close(() => process.exit(0)), 15000).unref();
     }
 
     Write-Log 'verifying Fast Mode by capturing Codex wire request service_tier'
-    $baseUrlConfig = 'model_providers.OpenAI.base_url="http://127.0.0.1:' + $port + '/v1"'
     $wireTier = $null
-    $codexJob = Start-Job -ScriptBlock {
-      param([string]$CodexPath, [string]$BaseUrlConfig)
-      & $CodexPath exec --json --skip-git-repo-check -c 'model_provider="OpenAI"' -c $BaseUrlConfig -c 'service_tier="fast"' -c 'model_reasoning_effort="low"' 'wire capture only' 2>&1 | Out-Null
-    } -ArgumentList $codex, $baseUrlConfig
+    $attemptIndex = 0
+    $attempts = @(
+      @{ ConfigKey = 'model_providers.OpenAI.base_url'; ExtraConfigs = @('model_provider="OpenAI"') },
+      @{ ConfigKey = 'openai_base_url'; ExtraConfigs = @() }
+    )
 
-    $requestDeadline = (Get-Date).AddSeconds(25)
-    while ((Get-Date) -lt $requestDeadline -and -not $wireTier) {
-      Start-Sleep -Milliseconds 200
-      if (-not (Test-Path -LiteralPath $logPath)) {
-        continue
-      }
-      foreach ($line in (Get-Content -LiteralPath $logPath)) {
-        if ($line -notmatch '"kind":"(frame|http)"') {
-          continue
+    foreach ($attempt in $attempts) {
+      $attemptIndex += 1
+      $outputPath = Join-Path $captureDir ("codex-output-attempt-{0}.txt" -f $attemptIndex)
+      $baseUrlConfig = $attempt.ConfigKey + '="http://127.0.0.1:' + $port + '/v1"'
+      Write-Log "fast verification attempt $attemptIndex using config key $($attempt.ConfigKey)"
+      $codexJob = Start-Job -ScriptBlock {
+        param(
+          [string]$CodexPath,
+          [string]$BaseUrlConfig,
+          [string[]]$ExtraConfigs,
+          [string]$OutputPath
+        )
+
+        $previousEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+          $args = @('exec', '--json', '--skip-git-repo-check', '--disable', 'plugins', '--disable', 'apps')
+          foreach ($extra in ($ExtraConfigs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+            $args += @('-c', $extra)
+          }
+          $args += @('-c', $BaseUrlConfig, '-c', 'service_tier="fast"', '-c', 'model_reasoning_effort="low"', 'wire capture only')
+          $output = & $CodexPath @args *>&1
+          $output | Set-Content -Path $OutputPath -Encoding UTF8
+          return $LASTEXITCODE
+        } finally {
+          $ErrorActionPreference = $previousEap
         }
-        # The captured Codex request can be very large because it contains the
-        # active prompt context. Avoid ConvertFrom-Json here; regex over the
-        # raw JSONL line is both faster and less fragile for this smoke test.
-        $match = [regex]::Match([string]$line, '\\?"service_tier\\?"\s*:\s*\\?"([^"\\]+)\\?"')
-        if ($match.Success) {
-          $wireTier = $match.Groups[1].Value
+      } -ArgumentList $codex, $baseUrlConfig, $attempt.ExtraConfigs, $outputPath
+
+      $requestDeadline = (Get-Date).AddSeconds(25)
+      while ((Get-Date) -lt $requestDeadline -and -not $wireTier) {
+        Start-Sleep -Milliseconds 200
+        $wireTier = Get-ServiceTierFromCaptureLog $logPath
+        if ($wireTier) {
+          break
+        }
+        if ($codexJob.State -in @('Completed', 'Failed', 'Stopped')) {
+          Start-Sleep -Milliseconds 300
+          $wireTier = Get-ServiceTierFromCaptureLog $logPath
           break
         }
       }
-      if ($codexJob.State -in @('Completed', 'Failed', 'Stopped') -and -not $wireTier) {
-        Start-Sleep -Milliseconds 300
-        if ((Get-Date) -lt $requestDeadline) {
-          continue
+
+      $timedOut = $false
+      if ($codexJob -and $codexJob.State -eq 'Running') {
+        $timedOut = $true
+        Stop-Job -Job $codexJob -ErrorAction SilentlyContinue
+      }
+
+      $attemptExitCode = $null
+      if ($codexJob) {
+        try {
+          $attemptExitCode = Receive-Job -Job $codexJob -Wait -AutoRemoveJob -ErrorAction SilentlyContinue
+        } catch {
+          $attemptExitCode = $null
         }
+        $codexJob = $null
+      }
+
+      if ($wireTier) {
         break
       }
+
+      $attemptMessage = "fast verification attempt $attemptIndex did not capture service_tier"
+      if ($timedOut) {
+        $attemptMessage += ' before timeout'
+      }
+      if ($attemptExitCode -ne $null) {
+        $attemptMessage += "; codex exit code=$attemptExitCode"
+      }
+      if (Test-Path -LiteralPath $outputPath) {
+        $tail = (Get-Content -LiteralPath $outputPath -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
+        if (-not [string]::IsNullOrWhiteSpace($tail)) {
+          if ($tail.Length -gt 600) {
+            $tail = '...' + $tail.Substring($tail.Length - 600)
+          }
+          $attemptMessage += "; output tail:`n$tail"
+        }
+      }
+      Write-Log $attemptMessage
     }
 
-    if ($codexJob -and $codexJob.State -eq 'Running') {
-      Stop-Job -Job $codexJob -ErrorAction SilentlyContinue
-    }
     if (-not $wireTier) {
+      $keepCapture = $true
+      Write-Log "fast verification capture kept at: $captureDir"
       Fail 'fast verification did not find service_tier in the captured request'
     }
     if ($wireTier -eq 'priority') {
@@ -1707,7 +1790,7 @@ setTimeout(() => server.close(() => process.exit(0)), 15000).unref();
     if ($server -and -not $server.HasExited) {
       Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
     }
-    if (-not $KeepWorkDir -and (Test-Path -LiteralPath $captureDir)) {
+    if (-not $keepCapture -and (Test-Path -LiteralPath $captureDir)) {
       Remove-Item -LiteralPath $captureDir -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
